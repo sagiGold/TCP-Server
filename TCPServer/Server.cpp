@@ -11,7 +11,7 @@ struct SocketState
 	SOCKET id;			// Socket handle
 	int	recv;			// Receiving?
 	int	send;			// Sending?
-	int sendSubType;	// Sending sub-type
+	HTTPRequests sendSubType;	// Sending sub-type
 	char buffer[128];
 	int len;
 };
@@ -314,23 +314,9 @@ void receiveMessage(int index)
 			buffer = buffer.substr(buffer.find(' ') + 1, string::npos);
 			queryString = buffer.substr(0, buffer.find(' '));
 
-			switch (getRequestNumber(sockets[index].buffer))
-			{
-			case TRACE:
-				break;
-			case DELETER:
-				break;
-			case PUT:
-				break;
-			case POST:
-				break;
-			case HEAD:
-				break;
-			case GET:
-				break;
-			case OPTIONS:
-				break;
-			}
+			//update request in buffer
+			sockets[index].send = SEND;			
+			sockets[index].sendSubType = getRequestNumber(method);
 		}
 	}
 
@@ -342,27 +328,63 @@ void sendMessage(int index)
 	char sendBuff[255];
 
 	SOCKET msgSocket = sockets[index].id;
-	if (sockets[index].sendSubType == SEND_TIME)
-	{
-		// Answer client's request by the current time string.
 
-		// Get the current time.
-		time_t timer;
-		time(&timer);
-		// Parse the current time to printable string.
-		strcpy(sendBuff, ctime(&timer));
-		sendBuff[strlen(sendBuff) - 1] = 0; //to remove the new-line from the created string
-	}
-	else if (sockets[index].sendSubType == SEND_SECONDS)
-	{
-		// Answer client's request by the current time in seconds.
+	// Get the current time.
+	time_t timer;
+	time(&timer);
 
-		// Get the current time.
-		time_t timer;
-		time(&timer);
-		// Convert the number to string.
-		itoa((int)timer, sendBuff, 10);
+	string response;
+	switch (getRequestNumber(sockets[index].buffer))
+	{
+	case (TRACE):
+		response =  "HTTP/1.1 200 OK";		
+		response += "request: TRACE\n";
+		response += buffer;
+		
+		break;
+	case (DELETER):
+		response = "request: DELETE\n";
+		break;
+	case (PUT):
+		response = "request: PUT\n";
+		break;
+	case (POST):
+		response = "request: POST\n";
+		break;
+	case (HEAD):
+		response = "request: HEAD\n";
+		break;
+	case (GET):
+		response = "request: GET\n";
+		break;
+	case (OPTIONS):
+		response = "request: OPTIONS\n";
+		break;
 	}
+
+	strcpy(sendBuff, response.c_str());
+
+
+
+	//if (sockets[index].sendSubType == SEND_TIME)
+	//{
+	//	// Answer client's request by the current time string.
+
+	//	// Get the current time.
+	//	time_t timer;
+	//	time(&timer);
+	//	// Parse the current time to printable string.
+	//	strcpy(sendBuff, ctime(&timer));
+	//	sendBuff[strlen(sendBuff) - 1] = 0; //to remove the new-line from the created string
+	//}
+	//else if (sockets[index].sendSubType == SEND_SECONDS)
+	//{
+	//	// Answer client's request by the current time in seconds.
+
+	//	
+	//	// Convert the number to string.
+	//	itoa((int)timer, sendBuff, 10);
+	//}
 
 	bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
 	if (SOCKET_ERROR == bytesSent)
@@ -376,18 +398,18 @@ void sendMessage(int index)
 	sockets[index].send = IDLE;
 }
 
-HTTPRequests getRequestNumber(char* recvBuff) {
+HTTPRequests getRequestNumber(string recvBuff) {
 	HTTPRequests req;
 
-	if (!strcmp(recvBuff, ""))
+	if (recvBuff == "TRACE")
 		req = TRACE;
-	else if (!strcmp(recvBuff, ""))
+	else if (recvBuff == "DELETE")
 		req = DELETER;
-	else if (!strcmp(recvBuff, ""))
+	else if (recvBuff ==  "POST")
 		req = POST;
-	else if (!strcmp(recvBuff, ""))
+	else if (recvBuff== "HEAD")
 		req = HEAD;
-	else if (!strcmp(recvBuff, ""))
+	else if (recvBuff== "GET")
 		req = GET;
 	else
 		req = OPTIONS;
