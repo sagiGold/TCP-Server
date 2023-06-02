@@ -44,6 +44,7 @@ void removeSocket(int index);
 void acceptConnection(int index);
 void receiveMessage(int index);
 void sendMessage(int index);
+int putRequest(struct SocketState* socket);
 
 struct SocketState sockets[MAX_SOCKETS] = { 0 };
 int socketsCount = 0;
@@ -323,6 +324,7 @@ void receiveMessage(int index)
 
 }
 
+// TODO pass socket as parameter and not global.
 void sendMessage(int index)
 {
 	int bytesSent = 0;
@@ -334,7 +336,7 @@ void sendMessage(int index)
 	time_t timer;
 	time(&timer);
 
-	string response;
+	string response, path = "C:\\Temp\\HTML_FILES\\";
 	switch (getRequestNumber(sockets[index].buffer))
 	{
 	case (TRACE):
@@ -348,48 +350,37 @@ void sendMessage(int index)
 		response += buffer;	
 		break;
 	case (DELETER):
-		response = "request: DELETE\n";
+		response = "Request: DELETE\n";
 		break;
 	case (PUT):
-
-		response += "request: PUT\n";
-
+		// TODO delete "insert, replace if already exists" as in "Here is the data for user 5"
+		response += "Request: PUT\n";
+		int statusCode = putRequest(&sockets[index]);
 		break;
 	case (POST):
-		response = "request: POST\n";
+		// הניחו כי בקשות אלה יכילו מחרוזות. השרת יציג מחרוזות אלה בקונסולה שלו.
+		response = "Request: POST\n";
 		break;
 	case (HEAD):
-		response = "request: HEAD\n";
+		response = "Request: HEAD\n";
 		break;
 	case (GET):
-		response = "request: GET\n";
+		// עליכם לתמוך גם ב-Query String
+		// אשר אם הוא נוכח וערכו he עליכם להחזיר את הדף בעברית, אם ערכו en אז להחזיר את הדף באנגלית ואם ערכו fr אז להחזיר את הדף בצרפתית 
+		// (במידה וקיימות גרסאות בשפות הללו לדף המבוקש).
+		response = "Request: GET\n";
 		break;
 	case (OPTIONS):
 		response = "HTTP/1.1 204 No Content\n Allow: OPTIONS, GET, HEAD, POST, TRACE, PUT\n Date: ";
 		response += ctime(&timer);
-		response = "request: OPTIONS\n";
+		response = "Request: OPTIONS\n";
+		break;
+	default:
+		response = "Request is not allowed. Ask for OPTIONS.\n";
 		break;
 	}
 
-	//if (sockets[index].sendSubType == SEND_TIME)
-	//{
-	//	// Answer client's request by the current time string.
-
-	//	// Get the current time.
-	//	time_t timer;
-	//	time(&timer);
-	//	// Parse the current time to printable string.
-	//	strcpy(sendBuff, ctime(&timer));
-	//	sendBuff[strlen(sendBuff) - 1] = 0; //to remove the new-line from the created string
-	//}
-	//else if (sockets[index].sendSubType == SEND_SECONDS)
-	//{
-	//	// Answer client's request by the current time in seconds.
-
-	//	
-	//	// Convert the number to string.
-	//	itoa((int)timer, sendBuff, 10);
-	//}
+	strcpy(sendBuff, response.c_str());
 
 	bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
 	if (SOCKET_ERROR == bytesSent)
@@ -420,4 +411,9 @@ HTTPRequests getRequestNumber(string recvBuff) {
 		req = OPTIONS;
 
 	return req;
+}
+
+int putRequest(struct SocketState* socket) {
+	int code;
+	return code;
 }
