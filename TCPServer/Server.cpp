@@ -351,7 +351,9 @@ void sendMessage(int index)
 		response = "request: DELETE\n";
 		break;
 	case (PUT):
-		response = "request: PUT\n";
+
+		response += "request: PUT\n";
+
 		break;
 	case (POST):
 		response = "request: POST\n";
@@ -363,12 +365,11 @@ void sendMessage(int index)
 		response = "request: GET\n";
 		break;
 	case (OPTIONS):
+		response = "HTTP/1.1 204 No Content\n Allow: OPTIONS, GET, HEAD, POST, TRACE, PUT\n Date: ";
+		response += ctime(&timer);
 		response = "request: OPTIONS\n";
 		break;
 	}
-
-
-
 
 	//if (sockets[index].sendSubType == SEND_TIME)
 	//{
