@@ -4,6 +4,7 @@ using namespace std;
 #pragma comment(lib, "Ws2_32.lib")
 #include <winsock2.h>
 #include <string.h>
+#include <string>
 #include <time.h>
 
 struct SocketState
@@ -338,9 +339,13 @@ void sendMessage(int index)
 	{
 	case (TRACE):
 		response =  "HTTP/1.1 200 OK";		
-		response += "request: TRACE\n";
-		response += buffer;
-		
+		response += "\nDate: ";
+		response += ctime(&timer);
+		response += "\nContent-Type: html";
+		response += "\nContent-length: ";
+		response += to_string(response.size() + strlen("\nRequest: TRACE \n") + buffer.size());
+		response += "\nRequest: TRACE \n";
+		response += buffer;	
 		break;
 	case (DELETER):
 		response = "request: DELETE\n";
@@ -362,7 +367,6 @@ void sendMessage(int index)
 		break;
 	}
 
-	strcpy(sendBuff, response.c_str());
 
 
 
