@@ -1,17 +1,18 @@
 #define _CRT_SECURE_NO_WARNINGS
-#include <iostream>
-using namespace std;
 #pragma comment(lib, "Ws2_32.lib")
 #include <winsock2.h>
+#include <iostream>
+#include <fstream>
 #include <string.h>
 #include <string>
 #include <time.h>
+using namespace std;
 
 struct SocketState
 {
-	SOCKET id;			// Socket handle
-	int	recv;			// Receiving?
-	int	send;			// Sending?
+	SOCKET id;					// Socket handle
+	int	recv;					// Receiving?
+	int	send;					// Sending?
 	HTTPRequests sendSubType;	// Sending sub-type
 	char buffer[128];
 	int len;
@@ -38,11 +39,13 @@ const int IDLE = 3;
 const int SEND = 4;
 const int SEND_TIME = 1;
 const int SEND_SECONDS = 2;
+const int BUFF_SIZE = 255;
+const char* FILE_PATH = "C:\\Temp\\HTML_FILES\\";
 
 bool addSocket(SOCKET id, int what);
-void removeSocket(int index);
 void acceptConnection(int index);
 void receiveMessage(int index);
+void removeSocket(int index);
 void sendMessage(int index);
 
 struct SocketState sockets[MAX_SOCKETS] = { 0 };
@@ -263,9 +266,7 @@ void acceptConnection(int index)
 	}
 	cout << "Time Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << endl;
 
-	//
 	// Set the socket to be in non-blocking mode.
-	//
 	unsigned long flag = 1;
 	if (ioctlsocket(msgSocket, FIONBIO, &flag) != 0)
 	{
@@ -326,15 +327,15 @@ void receiveMessage(int index)
 void sendMessage(int index)
 {
 	int bytesSent = 0;
-	char sendBuff[255];
+	char sendBuff[BUFF_SIZE], fileAddress[BUFF_SIZE];
+	string response;
 
 	SOCKET msgSocket = sockets[index].id;
 
-	// Get the current time.
+	// Get the current time
 	time_t timer;
 	time(&timer);
 
-	string response;
 	switch (getRequestNumber(sockets[index].buffer))
 	{
 	case (TRACE):
@@ -343,14 +344,28 @@ void sendMessage(int index)
 		response += ctime(&timer);
 		response += "\nContent-Type: html";
 		response += "\nContent-length: ";
-		response += to_string(response.size() + strlen("\nRequest: TRACE \n") + buffer.size());
-		response += "\nRequest: TRACE \n";
+		response += to_string(response.size() + strlen("\nRequest: TRACE\n") + buffer.size());
+		response += "\nRequest: TRACE\n";
 		response += buffer;	
 		break;
 	case (DELETER):
-		response = "request: DELETE\n";
+		strcpy(fileAddress, FILE_PATH);
+		strcat(fileAddress, strtok(sockets[index].buffer, " ")); // Adds the file name
+		if (remove(fileAddress) == 0)
+			response = "HTTP/1.1 204 No Content"; // The server successfully processed the request, but is not returning any content 
+		else
+			response = "HTTP/1.1 404 Not Found"; // Failed to remove resource
+
+		response += "\r\nDate: ";
+		response += ctime(&timer);
+		response += "\nContent-length: ";
+		response += to_string(response.size() + strlen("\nRequest: DELETE\n") + buffer.size());
+		response += "\nRequest: DELETE\n";
 		break;
 	case (PUT):
+
+
+		
 		response = "request: PUT\n";
 		break;
 	case (POST):
@@ -400,6 +415,39 @@ void sendMessage(int index)
 	cout << "Time Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sendBuff << "\" message.\n";
 
 	sockets[index].send = IDLE;
+}
+
+int putRequest(int index, char* filename, SocketState* sockets)
+{
+	string content, buffer = (string)sockets[index].buffer, address = "C:\\Temp\\HTML_FILES\\";
+	int buffLen = 0;
+	int retCode = 200; // 'OK' code
+	size_t found;
+	filename = strtok(sockets[index].buffer, " ");
+	address += filename;
+	fstream oFile;
+	oFile.open(address);
+
+	if (!oFile.good())
+	{
+		oFile.open(address, ios::out);
+		retCode = 201; // New file created
+	}
+
+	if (!oFile.good())
+	{
+		cout << "HTTP Server: Error writing file to local storage: " << WSAGetLastError() << endl;
+		return 0; // Error opening file
+	}
+	found = buffer.find("\r\n\r\n");
+	content = &buffer[found + 4];
+	if (content.length() == 0)
+		retCode = 204; // No content
+	else
+		oFile << content;
+
+	oFile.close();
+	return retCode;
 }
 
 HTTPRequests getRequestNumber(string recvBuff) {
