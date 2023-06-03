@@ -1,4 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS
+//#define _WINSOCK_DEPRECATED_NO_WARNINGS 
 #pragma comment(lib, "Ws2_32.lib")
 #include <winsock2.h>
 #include <iostream>
@@ -8,15 +9,6 @@
 #include <time.h>
 using namespace std;
 
-struct SocketState
-{
-	SOCKET id;					// Socket handle
-	int	recv;					// Receiving?
-	int	send;					// Sending?
-	HTTPRequests sendSubType;	// Sending sub-type
-	char buffer[128];
-	int len;
-};
 
 enum HTTPRequests {
 	TRACE,
@@ -28,7 +20,15 @@ enum HTTPRequests {
 	OPTIONS
 };
 
-HTTPRequests getRequestNumber(char* recvBuff);
+struct SocketState
+{
+	SOCKET id;					// Socket handle
+	int	recv;					// Receiving?
+	int	send;					// Sending?
+	HTTPRequests sendSubType;	// Sending sub-type
+	char buffer[128];
+	int len;
+};
 
 const int TIME_PORT = 27015;
 const int MAX_SOCKETS = 60;
@@ -40,7 +40,7 @@ const int SEND = 4;
 const int SEND_TIME = 1;
 const int SEND_SECONDS = 2;
 const int BUFF_SIZE = 255;
-const char* FILE_PATH = "C:\\Temp\\HTML_FILES\\";
+const char* FILE_PATH = "C:\\temp\\html_files_ex3\\";
 
 bool addSocket(SOCKET id, int what);
 void acceptConnection(int index);
@@ -48,7 +48,11 @@ void receiveMessage(int index);
 void removeSocket(int index);
 void sendMessage(int index);
 int putRequest(struct SocketState* socket);
+int getRequest(struct SocketState* socket);
+HTTPRequests getRequestNumber(string recvBuff);
 string handlePutRequest(int index, SocketState* sockets);
+string handlePostRequest(int index, SocketState* sockets);
+string handleGetRequest(int index, SocketState* sockets);
 
 struct SocketState sockets[MAX_SOCKETS] = { 0 };
 int socketsCount = 0;
@@ -359,38 +363,46 @@ void sendMessage(int index)
 		else
 			response = "HTTP/1.1 404 Not Found"; // Failed to remove resource
 
-		response += "\r\nDate: ";
+		response += "\nDate: ";
 		response += ctime(&timer);
 		response += "\nContent-length: ";
-		response += to_string(response.size() + strlen("\nRequest: DELETE\n") + buffer.size());
+		response += to_string(response.size() + strlen("\nRequest: DELETE\n"));
 		response += "\nRequest: DELETE\n";
 		break;
 	case (PUT):
 		// TODO delete "insert, replace if already exists" as in "Here is the data for user 5" - sagi: didn't get it, please explain
 		response = handlePutRequest(index, sockets);
-		response += "\r\nDate: ";
+		response += "\nDate: ";
 		response += ctime(&timer);
 		response += "\nContent-length: ";
-		response += to_string(response.size() + strlen("\nRequest: PUT\n") + buffer.size());
+		response += to_string(response.size() + strlen("\nRequest: PUT\n"));
 		response += "\nRequest: PUT\n";
 		break;
-	case (POST):
-		// äðéçå ëé á÷ùåú àìä éëéìå îçøåæåú. äùøú éöéâ îçøåæåú àìä á÷åðñåìä ùìå.
-		response = "Request: POST\n";
+	case (POST):		
+		cout << endl << "POST request has been recieved: \n" << queryString << endl;
+		response = "HTTP/1.1 200 OK";
+		response += "Post message was outputed on the server's console.";
+		response += "\nDate: ";
+		response += ctime(&timer);
+		response += "\nContent-length: ";
+		response += to_string(response.size() + strlen("\nRequest: POST\n"));
+		response += "Request: POST\n";
 		break;
-	case (HEAD):
-		response = "Request: HEAD\n";
+	case (HEAD):		
+		response += "Request: HEAD\n";
 		break;
 	case (GET):
-		// òìéëí ìúîåê âí á-Query String
-		// àùø àí äåà ðåëç åòøëå he òìéëí ìäçæéø àú äãó áòáøéú, àí òøëå en àæ ìäçæéø àú äãó áàðâìéú åàí òøëå fr àæ ìäçæéø àú äãó áöøôúéú 
-		// (áîéãä å÷ééîåú âøñàåú áùôåú äììå ìãó äîáå÷ù).
-		response = "Request: GET\n";
+		response = handleGetRequest(index, sockets);
+		response += "\nDate: ";
+		response += ctime(&timer);
+		response += "\nContent-length: ";
+		response += to_string(response.size() + strlen("\nRequest: GET\n"));
+		response += "Request: GET\n";
 		break;
 	case (OPTIONS):
 		response = "HTTP/1.1 204 No Content\n Allow: OPTIONS, GET, HEAD, POST, TRACE, PUT\n Date: ";
 		response += ctime(&timer);
-		response = "Request: OPTIONS\n";
+		response = "\nRequest: OPTIONS\n";
 		break;
 	default:
 		response = "Request is not allowed. Ask for OPTIONS.\n";
@@ -444,30 +456,25 @@ int putRequest(int index, SocketState* sockets)
 	return statusCode;
 }
 
-string handlePutRequest(int index, SocketState* sockets)
-{
+string handlePutRequest(int index, SocketState* sockets) {
 	switch (putRequest(index, sockets))
 	{
 	case 0:
 	{
 		return "HTTP/1.1 412 Precondition failed";
 	}
-
 	case 200:
 	{
 		return "HTTP/1.1 200 OK";
 	}
-
 	case 201:
 	{
 		return "HTTP/1.1 201 Created";
 	}
-
 	case 204:
 	{
 		return "HTTP/1.1 204 No Content";
 	}
-
 	default:
 	{
 		return "HTTP/1.1 501 Not Implemented";
@@ -494,3 +501,58 @@ HTTPRequests getRequestNumber(string recvBuff) {
 	return req;
 }
 
+string getRequest(int index, SocketState* sockets) {
+	string fileName = queryString.substr(1, queryString.find('.') - 1),
+		   fileSuffix = queryString.substr(8, queryString.find('?') - queryString.find('.') - 1),
+		   param = queryString.substr(queryString.find('?') + 1, string::npos);
+
+	if ((fileSuffix != "html" && fileSuffix != "txt") || (param != "lang=he" && param != "lang=fr" && param != "lang=en")){
+		cout << "Error! wrong params!";
+		return "400";
+	}
+
+	string lang = "en";
+	if (param == "lang=he") {
+		lang = "he";
+	}
+	else if (param == "lang=fr") {
+		lang = "fr";
+	}
+
+	// get content from file to string 
+	ifstream file;
+	file.open((FILE_PATH+lang+"."+ fileSuffix+"\\"));
+	string content = "", line;
+
+	if (file) {		
+		while (getline(file, line))
+			content += line;
+	}
+	else {
+		content = "404";
+	}
+
+
+	file.close();
+
+	return content;
+}
+
+string handleGetRequest(int index, SocketState* sockets) {
+	string content = getRequest(index, sockets);
+
+	if (content == "") {
+		return "HTTP/1.1 204 No Content";
+	}
+	else if (content == "400") {
+		return "HTTP/1.1 400 Bad Request";
+	}
+	else if (content == "404") {
+		return "HTTP/1.1 404 Not Found";
+	}
+	else {
+		string response = "HTTP/1.1 200 OK\n";
+		response += content;
+		return response;
+	}
+}
