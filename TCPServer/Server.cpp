@@ -366,10 +366,13 @@ void sendMessage(int index)
 		response += "\nRequest: DELETE\n";
 		break;
 	case (PUT):
-		// TODO delete "insert, replace if already exists" as in "Here is the data for user 5"
+		// TODO delete "insert, replace if already exists" as in "Here is the data for user 5" - sagi: didn't get it, please explain
 		response = handlePutRequest(index, sockets);
-		response = "Request: PUT\n";
-		int statusCode = putRequest(&sockets[index]);
+		response += "\r\nDate: ";
+		response += ctime(&timer);
+		response += "\nContent-length: ";
+		response += to_string(response.size() + strlen("\nRequest: PUT\n") + buffer.size());
+		response += "\nRequest: PUT\n";
 		break;
 	case (POST):
 		// äðéçå ëé á÷ùåú àìä éëéìå îçøåæåú. äùøú éöéâ îçøåæåú àìä á÷åðñåìä ùìå.
@@ -408,77 +411,66 @@ void sendMessage(int index)
 	sockets[index].send = IDLE;
 }
 
-int putRequest(char* filename, int index, SocketState* sockets)
+int putRequest(int index, SocketState* sockets)
 {
-	string content, buffer = (string)sockets[index].buffer, address = "C:\\Temp\\HTML_FILES\\";
-	int buffLen = 0;
-	int retCode = 200; // 'OK' code
+	string content, buffer, address;
+	int statusCode = 200; // 'OK' code
 	size_t found;
-	filename = strtok(sockets[index].buffer, " ");
-	address += filename;
 	fstream oFile;
+
+	buffer = (string)sockets[index].buffer;
+	address = FILE_PATH + (string)strtok(sockets[index].buffer, " ");
 	oFile.open(address);
 
 	if (!oFile.good())
 	{
-		oFile.open(address, ios::out);
-		retCode = 201; // New file created
+		oFile.open(address, ios::out); // Created new file
+		statusCode = 201; 
 	}
-
 	if (!oFile.good())
 	{
-		cout << "HTTP Server: Error writing file to local storage: " << WSAGetLastError() << endl;
-		return 0; // Error opening file
+		cout << "HTTP Server - Failed to open file: " << WSAGetLastError() << endl;
+		return 0; // Failed open file
 	}
+
 	found = buffer.find("\r\n\r\n");
 	content = &buffer[found + 4];
 	if (content.length() == 0)
-		retCode = 204; // No content
+		statusCode = 204; // No content
 	else
 		oFile << content;
 
 	oFile.close();
-	return retCode;
+	return statusCode;
 }
 
 string handlePutRequest(int index, SocketState* sockets)
 {
-	int statusCode;
-	char fileName[BUFF_SIZE];
-	string response;
-
-	statusCode = putRequest(fileName, index, sockets);
-	switch (statusCode)
+	switch (putRequest(index, sockets))
 	{
 	case 0:
 	{
-		cout << "PUT " << fileName << "Failed";
-		response = "HTTP/1.1 412 Precondition failed \r\nDate: ";
-		break;
+		return "HTTP/1.1 412 Precondition failed";
 	}
 
 	case 200:
 	{
-		response = "HTTP/1.1 200 OK \r\nDate: ";
-		break;
+		return "HTTP/1.1 200 OK";
 	}
 
 	case 201:
 	{
-		response = "HTTP/1.1 201 Created \r\nDate: ";
-		break;
+		return "HTTP/1.1 201 Created";
 	}
 
 	case 204:
 	{
-		response = "HTTP/1.1 204 No Content \r\nDate: ";
-		break;
+		return "HTTP/1.1 204 No Content";
 	}
 
 	default:
 	{
-		response = "HTTP/1.1 501 Not Implemented \r\nDate: ";
-		break;
+		return "HTTP/1.1 501 Not Implemented";
 	}
 	}
 }
