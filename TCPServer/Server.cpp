@@ -48,11 +48,11 @@ void receiveMessage(int index);
 void removeSocket(int index);
 void sendMessage(int index);
 int putRequest(struct SocketState* socket);
-int getRequest(struct SocketState* socket);
+string getRequest(int index, SocketState* sockets, bool isGet);
 HTTPRequests getRequestNumber(string recvBuff);
 string handlePutRequest(int index, SocketState* sockets);
 string handlePostRequest(int index, SocketState* sockets);
-string handleGetRequest(int index, SocketState* sockets);
+string handleGetRequest(int index, SocketState* sockets, bool isGet);
 
 struct SocketState sockets[MAX_SOCKETS] = { 0 };
 int socketsCount = 0;
@@ -389,10 +389,15 @@ void sendMessage(int index)
 		response += "Request: POST\n";
 		break;
 	case (HEAD):		
+		response = handleGetRequest(index, sockets, false);
+		response += "\nDate: ";
+		response += ctime(&timer);
+		response += "\nContent-length: ";
+		response += to_string(response.size() + strlen("\nRequest: HEAD\n"));
 		response += "Request: HEAD\n";
 		break;
 	case (GET):
-		response = handleGetRequest(index, sockets);
+		response = handleGetRequest(index, sockets, true);
 		response += "\nDate: ";
 		response += ctime(&timer);
 		response += "\nContent-length: ";
@@ -423,10 +428,9 @@ void sendMessage(int index)
 	sockets[index].send = IDLE;
 }
 
-int putRequest(int index, SocketState* sockets)
-{
+int putRequest(int index, SocketState* sockets) {
 	string content, buffer, address;
-	int statusCode = 200; // 'OK' code
+	int statusCode = 200;
 	size_t found;
 	fstream oFile;
 
@@ -501,7 +505,7 @@ HTTPRequests getRequestNumber(string recvBuff) {
 	return req;
 }
 
-string getRequest(int index, SocketState* sockets) {
+string getRequest(int index, SocketState* sockets, bool isGet) {
 	string fileName = queryString.substr(1, queryString.find('.') - 1),
 		   fileSuffix = queryString.substr(8, queryString.find('?') - queryString.find('.') - 1),
 		   param = queryString.substr(queryString.find('?') + 1, string::npos);
@@ -524,9 +528,14 @@ string getRequest(int index, SocketState* sockets) {
 	file.open((FILE_PATH+lang+"."+ fileSuffix+"\\"));
 	string content = "", line;
 
-	if (file) {		
-		while (getline(file, line))
-			content += line;
+	if (file) {	
+		if (isGet) {
+			while (getline(file, line))
+				content += line;
+		}
+		else {
+			content = "200";
+		}		
 	}
 	else {
 		content = "404";
@@ -538,8 +547,8 @@ string getRequest(int index, SocketState* sockets) {
 	return content;
 }
 
-string handleGetRequest(int index, SocketState* sockets) {
-	string content = getRequest(index, sockets);
+string handleGetRequest(int index, SocketState* sockets, bool isGet) {
+	string content = getRequest(index, sockets, isGet);
 
 	if (content == "") {
 		return "HTTP/1.1 204 No Content";
