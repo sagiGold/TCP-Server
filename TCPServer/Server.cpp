@@ -48,6 +48,7 @@ void receiveMessage(int index);
 void removeSocket(int index);
 void sendMessage(int index);
 int putRequest(struct SocketState* socket);
+string handlePutRequest(int index, SocketState* sockets);
 
 struct SocketState sockets[MAX_SOCKETS] = { 0 };
 int socketsCount = 0;
@@ -366,6 +367,7 @@ void sendMessage(int index)
 		break;
 	case (PUT):
 		// TODO delete "insert, replace if already exists" as in "Here is the data for user 5"
+		response = handlePutRequest(index, sockets);
 		response = "Request: PUT\n";
 		int statusCode = putRequest(&sockets[index]);
 		break;
@@ -406,7 +408,7 @@ void sendMessage(int index)
 	sockets[index].send = IDLE;
 }
 
-int putRequest(int index, char* filename, SocketState* sockets)
+int putRequest(char* filename, int index, SocketState* sockets)
 {
 	string content, buffer = (string)sockets[index].buffer, address = "C:\\Temp\\HTML_FILES\\";
 	int buffLen = 0;
@@ -439,6 +441,48 @@ int putRequest(int index, char* filename, SocketState* sockets)
 	return retCode;
 }
 
+string handlePutRequest(int index, SocketState* sockets)
+{
+	int statusCode;
+	char fileName[BUFF_SIZE];
+	string response;
+
+	statusCode = putRequest(fileName, index, sockets);
+	switch (statusCode)
+	{
+	case 0:
+	{
+		cout << "PUT " << fileName << "Failed";
+		response = "HTTP/1.1 412 Precondition failed \r\nDate: ";
+		break;
+	}
+
+	case 200:
+	{
+		response = "HTTP/1.1 200 OK \r\nDate: ";
+		break;
+	}
+
+	case 201:
+	{
+		response = "HTTP/1.1 201 Created \r\nDate: ";
+		break;
+	}
+
+	case 204:
+	{
+		response = "HTTP/1.1 204 No Content \r\nDate: ";
+		break;
+	}
+
+	default:
+	{
+		response = "HTTP/1.1 501 Not Implemented \r\nDate: ";
+		break;
+	}
+	}
+}
+
 HTTPRequests getRequestNumber(string recvBuff) {
 	HTTPRequests req;
 
@@ -458,7 +502,3 @@ HTTPRequests getRequestNumber(string recvBuff) {
 	return req;
 }
 
-int putRequest(struct SocketState* socket) {
-	int code;
-	return code;
-}
